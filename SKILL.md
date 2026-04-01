@@ -81,8 +81,17 @@ Verify:
 - Prefer `agents.list`, `channels.*.accounts`, and `bindings`.
 - Avoid migrating unknown top-level fields from older source configs.
 - Exclude runtime artifacts like `sessions`, logs, caches, cookies, and screenshots.
+- Do not exclude executable workspace content such as `scripts/`, `tests/`, `knowledge/`, `agent-config.json`, `README.md`, or operational `memory/` config files.
 - Sanitize API keys in customer-facing config templates.
 - Keep raw secret-bearing files only for local testing, never for external distribution.
+
+## Known Migration Failure Modes
+
+- Packaging only identity files while omitting executable workspace files like `scripts/` makes the target agent reply but fail to actually run tasks.
+- Omitting operational `memory/` files like `memory/users.json` or `memory/*/accounts.txt` breaks agents that treat memory as live config.
+- Migrating channel account config without restarting the gateway leaves the target instance on stale runtime config.
+- If the target reports `gateway token mismatch`, the service install is out of sync with the active config and may need `openclaw gateway install --force` from the intended state directory.
+- Agent-local `agent-config.json` can drift from global `openclaw.json`; packaged bundles should keep them aligned.
 
 ## Multi-Agent Packaging Guidance
 

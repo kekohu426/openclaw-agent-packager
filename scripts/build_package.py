@@ -20,10 +20,12 @@ ROOT_FILES = {
     'TOOLS.md',
     'USER.md',
 }
-DIRS_ALWAYS = {'config', 'discoveries', 'data'}
+DIRS_ALWAYS = {'config', 'discoveries', 'data', 'scripts', 'knowledge', 'tests'}
 SKIP_DIR_NAMES = {'sessions', '.git', '.openclaw', 'node_modules', '__pycache__', '.next', 'dist', 'build'}
 SKIP_FILE_NAMES = {'cookies.youtube.txt'}
 SKIP_SUFFIXES = {'.png', '.jpg', '.jpeg', '.webp', '.log', '.pyc', '.zip'}
+MEMORY_DIR_SKIP_NAMES = {'articles', 'notes', 'logs', 'outputs', 'screenshots', 'sessions'}
+MEMORY_REQUIRED_EXTS = {'.json', '.txt', '.md', '.yaml', '.yml', '.csv'}
 SKILL_TEXT_FILES = {
     'SKILL.md',
     'README.md',
@@ -113,6 +115,41 @@ def copy_tree_slim(source: Path, target: Path) -> int:
     return count
 
 
+def copy_top_level_files(source: Path, target: Path) -> int:
+    count = 0
+    for path in source.iterdir():
+        if not path.is_file():
+            continue
+        if should_skip_file(path):
+            continue
+        dest = target / path.name
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, dest)
+        count += 1
+    return count
+
+
+def copy_memory_operational(source: Path, target: Path) -> int:
+    count = 0
+    if not source.exists():
+        return count
+    for path in source.rglob('*'):
+        rel = path.relative_to(source)
+        if any(part in SKIP_DIR_NAMES or part in MEMORY_DIR_SKIP_NAMES for part in rel.parts):
+            continue
+        if not path.is_file():
+            continue
+        if path.suffix.lower() not in MEMORY_REQUIRED_EXTS:
+            continue
+        if should_skip_file(path):
+            continue
+        dest = target / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, dest)
+        count += 1
+    return count
+
+
 def copy_skills_slim(source: Path, target: Path) -> int:
     count = 0
     if not source.exists():
@@ -141,6 +178,9 @@ def copy_workspace(source: Path, target: Path, include_memory: bool) -> list[str
     if not source.exists():
         return copied
 
+    top_level_count = copy_top_level_files(source, target)
+    copied.append(f'top-level files ({top_level_count} files)')
+
     for name in ROOT_FILES:
         path = source / name
         if path.exists() and path.is_file():
@@ -155,11 +195,14 @@ def copy_workspace(source: Path, target: Path, include_memory: bool) -> list[str
             file_count = copy_tree_slim(path, target / dirname)
             copied.append(f'{dirname}/ ({file_count} files)')
 
-    if include_memory:
-        path = source / 'memory'
-        if path.exists() and path.is_dir():
+    path = source / 'memory'
+    if path.exists() and path.is_dir():
+        if include_memory:
             file_count = copy_tree_slim(path, target / 'memory')
             copied.append(f'memory/ ({file_count} files)')
+        else:
+            file_count = copy_memory_operational(path, target / 'memory')
+            copied.append(f'memory-operational/ ({file_count} files)')
 
     skills_path = source / 'skills'
     if skills_path.exists() and skills_path.is_dir():
